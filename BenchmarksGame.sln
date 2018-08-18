@@ -29,6 +29,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NBody.Benchmarks", "NBody.B
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{C41F081B-F472-499B-A0AC-E7DBD30F30BC}"
 	ProjectSection(SolutionItems) = preProject
+		.gitattributes = .gitattributes
+		.gitignore = .gitignore
 		Directory.Build.props = Directory.Build.props
 		Directory.Build.targets = Directory.Build.targets
 		global.json = global.json
@@ -43,7 +45,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NBodyCppBaseline", "NBodyCp
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NBodyCpp.Benchmarks", "NBodyCpp.Benchmarks\NBodyCpp.Benchmarks.csproj", "{D55C80C8-FA56-4288-998C-D776C20C5C45}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NBodyCpp.Tests", "NBodyCpp.Tests\NBodyCpp.Tests.csproj", "{892FE7BB-BDCB-4CE2-AAB0-6C96D6918064}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NBodyCpp.Tests", "NBodyCpp.Tests\NBodyCpp.Tests.csproj", "{892FE7BB-BDCB-4CE2-AAB0-6C96D6918064}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
