@@ -2,11 +2,24 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp2.1</TargetFramework>
+    <TargetFramework>netcoreapp3.0</TargetFramework>
+    <RuntimeIdentifiers>linux-x64;win-x64;osx-x64</RuntimeIdentifiers>
+    <RuntimeIdentifier Condition="$(RuntimeIdentifier) == ''">win-x64</RuntimeIdentifier>
+    <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
   </PropertyGroup>
 
   <PropertyGroup>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <LangVersion>latest</LangVersion>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NetCore.App" Version="3.0.0-preview1-26814-05" />
+    <PackageReference Include="Microsoft.NetCore.Jit" Version="3.0.0-preview1-26814-05" />
+    <PackageReference Include="Microsoft.NetCore.Runtime.CoreClr" Version="3.0.0-preview1-26814-05" />
+    <PackageReference Include="Microsoft.NETCore.Platforms" Version="3.0.0-preview1-26814-05" />
+    <PackageReference Include="Microsoft.NETCore.Targets" Version="3.0.0-preview1-26814-05" />
+    <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="4.6.0-preview1-26814-05" />
+  </ItemGroup>
 
 </Project>

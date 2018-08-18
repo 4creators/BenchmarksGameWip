@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "NBodyCpp": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "COMPlus_EnableAVX": "0"
+      }
+    }
+  }
+}

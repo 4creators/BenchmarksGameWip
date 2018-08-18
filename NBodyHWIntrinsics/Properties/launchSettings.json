@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "NBodyHWIntrinsics": {
+      "commandName": "Project"
+    },
+    "PublishTarget": {
+      "commandName": "Executable",
+      "executablePath": "E:\\src\\ms\\dotnet\\BenchmarksGame\\NBodyHWIntrinsics\\bin\\Debug\\netcoreapp3.0\\win-x64\\publish\\NBodyHWIntrinsics.exe",
+      "workingDirectory": "E:\\src\\ms\\dotnet\\BenchmarksGame\\NBodyHWIntrinsics\\bin\\Debug\\netcoreapp3.0\\win-x64\\publish"
+    }
+  }
+}

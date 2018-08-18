@@ -1,0 +1,16 @@
+﻿<Project>
+
+  <Target
+    BeforeTargets="Publish"
+    Name="CoreClrCopyProduct"
+    Condition="($(CopyLocalClrProduct) == 'true') And ($(ProjectExtension) == '.csproj')">
+
+    <Message Condition="$(OS) == 'Windows_NT'" Text="xcopy /U /K /Y $(CoreClrProductDir)*.* $(PublishDir)*.*" Importance="Normal" />
+    <Exec Condition="$(OS) == 'Windows_NT'" Command="xcopy /U /K /Y $(CoreClrProductDir)*.* $(PublishDir)*.*" StandardOutputImportance="Normal" />
+
+    <Message Condition="$(OS) != 'Windows_NT'" Text="cp -a -v $(CoreClrProductDir)*.so $(PublishDir)/" Importance="Normal" />
+    <Exec Condition="$(OS) != 'Windows_NT'" Command="cp -a -v $(CoreClrProductDir)*.so $(PublishDir)/" StandardOutputImportance="Normal" />
+
+  </Target>
+
+</Project>

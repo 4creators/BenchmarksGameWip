@@ -6,191 +6,201 @@
 */
 
 using System;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
-unsafe public static class NBody_StructPtr2
+namespace NBodyBaseline
 {
-    struct NBody { public double x, y, z, vx, vy, vz, mass; }
 
-    public static void Main(string[] args)
+    unsafe public static class NBodyPtr2
     {
-        unchecked
+        public struct NBody { public double x, y, z, vx, vy, vz, mass; }
+
+        private static readonly string format = "0,0";
+
+        public static void Main(string[] args)
         {
-
-            // There doesn't seem to be a difference between
-            // using stackalloc or fixed pointer.
-            // stackalloc uses fewer lines though.
-
-            NBody* ptrSun = stackalloc NBody[5];
-            NBody* ptrEnd = ptrSun + 4;
-            InitBodies(ptrSun, ptrEnd);
-
-            Console.Out.WriteLine(Energy(ptrSun, ptrEnd).ToString("F9"));
-
-            int advancements = args.Length > 0 ? Int32.Parse(args[0]) : 1000;
-            while (advancements-- > 0)
+            var stopWatch = Stopwatch.StartNew();
+            unchecked
             {
-                Advance(ptrSun, ptrEnd, 0.01d);
+
+                // There doesn't seem to be a difference between
+                // using stackalloc or fixed pointer.
+                // stackalloc uses fewer lines though.
+
+                NBody* ptrSun = stackalloc NBody[5];
+                NBody* ptrEnd = ptrSun + 4;
+
+                InitBodies(ptrSun, ptrEnd);
+                Console.Out.WriteLine(Energy(ptrSun, ptrEnd).ToString("F9"));
+
+                int advancements = args.Length > 0 ? Int32.Parse(args[0]) : 50000000;
+                while (advancements-- > 0)
+                {
+                    Advance(ptrSun, ptrEnd, 0.01d);
+                }
+                Console.Out.WriteLine(Energy(ptrSun, ptrEnd).ToString("F9"));
             }
-            Console.Out.WriteLine(Energy(ptrSun, ptrEnd).ToString("F9"));
+            stopWatch.Stop();
+            Console.WriteLine($"NBody C# Baseline Elapsed Time: {stopWatch.Elapsed}");
         }
-    }
 
 
-    // Apparently minimizing the number of parameters in a function
-    // leads to improvements... This eliminates d2 from Advance()
+        // Apparently minimizing the number of parameters in a function
+        // leads to improvements... This eliminates d2 from Advance()
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static double GetD2(double dx, double dy, double dz)
-    {
-        double d2 = dx * dx + dy * dy + dz * dz;
-        return d2 * Math.Sqrt(d2);
-    }
-
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void Advance(NBody* ptrSun, NBody* ptrEnd, double distance)
-    {
-        unchecked
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static double GetD2(double dx, double dy, double dz)
         {
-            for (NBody* bi = ptrSun; bi < ptrEnd; ++bi)
+            double d2 = dx * dx + dy * dy + dz * dz;
+            return d2 * Math.Sqrt(d2);
+        }
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Advance(NBody* ptrSun, NBody* ptrEnd, double distance)
+        {
+            unchecked
             {
+                for (NBody* bi = ptrSun; bi < ptrEnd; ++bi)
+                {
 
-                // Dereference common variables now so they're likely to
-                // get stored in registers. The performance advantage is
-                // lost if pointers are dereferenced every time. Accounts for ~7%.
+                    // Dereference common variables now so they're likely to
+                    // get stored in registers. The performance advantage is
+                    // lost if pointers are dereferenced every time. Accounts for ~7%.
 
-                double
-                    ix = bi->x,
-                    iy = bi->y,
-                    iz = bi->z,
-                    ivx = bi->vx,
-                    ivy = bi->vy,
-                    ivz = bi->vz,
-                    imass = bi->mass;
-                for (NBody* bj = bi + 1; bj <= ptrEnd; ++bj)
+                    double
+                        ix = bi->x,
+                        iy = bi->y,
+                        iz = bi->z,
+                        ivx = bi->vx,
+                        ivy = bi->vy,
+                        ivz = bi->vz,
+                        imass = bi->mass;
+                    for (NBody* bj = bi + 1; bj <= ptrEnd; ++bj)
+                    {
+                        double
+                            dx = bj->x - ix,
+                            dy = bj->y - iy,
+                            dz = bj->z - iz,
+                            jmass = bj->mass,
+                            mag = distance / GetD2(dx, dy, dz);
+                        bj->vx = bj->vx - dx * imass * mag;
+                        bj->vy = bj->vy - dy * imass * mag;
+                        bj->vz = bj->vz - dz * imass * mag;
+                        ivx = ivx + dx * jmass * mag;
+                        ivy = ivy + dy * jmass * mag;
+                        ivz = ivz + dz * jmass * mag;
+                    }
+                    bi->vx = ivx;
+                    bi->vy = ivy;
+                    bi->vz = ivz;
+                    bi->x = ix + ivx * distance;
+                    bi->y = iy + ivy * distance;
+                    bi->z = iz + ivz * distance;
+                }
+                ptrEnd->x = ptrEnd->x + ptrEnd->vx * distance;
+                ptrEnd->y = ptrEnd->y + ptrEnd->vy * distance;
+                ptrEnd->z = ptrEnd->z + ptrEnd->vz * distance;
+            }
+        }
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static double Energy(NBody* ptrSun, NBody* ptrEnd)
+        {
+            unchecked
+            {
+                double e = 0.0;
+                for (NBody* bi = ptrSun; bi <= ptrEnd; ++bi)
                 {
                     double
-                        dx = bj->x - ix,
-                        dy = bj->y - iy,
-                        dz = bj->z - iz,
-                        jmass = bj->mass,
-                        mag = distance / GetD2(dx, dy, dz);
-                    bj->vx = bj->vx - dx * imass * mag;
-                    bj->vy = bj->vy - dy * imass * mag;
-                    bj->vz = bj->vz - dz * imass * mag;
-                    ivx = ivx + dx * jmass * mag;
-                    ivy = ivy + dy * jmass * mag;
-                    ivz = ivz + dz * jmass * mag;
+                        imass = bi->mass,
+                        ix = bi->x,
+                        iy = bi->y,
+                        iz = bi->z,
+                        ivx = bi->vx,
+                        ivy = bi->vy,
+                        ivz = bi->vz;
+                    e += 0.5 * imass * (ivx * ivx + ivy * ivy + ivz * ivz);
+                    for (NBody* bj = bi + 1; bj <= ptrEnd; ++bj)
+                    {
+                        double
+                            jmass = bj->mass,
+                            dx = ix - bj->x,
+                            dy = iy - bj->y,
+                            dz = iz - bj->z;
+
+                        var test = Math.Sqrt(dx * dx + dy * dy + dz * dz);
+
+                        e -= imass * jmass / test;
+                    }
                 }
-                bi->vx = ivx;
-                bi->vy = ivy;
-                bi->vz = ivz;
-                bi->x = ix + ivx * distance;
-                bi->y = iy + ivy * distance;
-                bi->z = iz + ivz * distance;
+                return e;
             }
-            ptrEnd->x = ptrEnd->x + ptrEnd->vx * distance;
-            ptrEnd->y = ptrEnd->y + ptrEnd->vy * distance;
-            ptrEnd->z = ptrEnd->z + ptrEnd->vz * distance;
         }
-    }
 
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static double Energy(NBody* ptrSun, NBody* ptrEnd)
-    {
-        unchecked
+        public static void InitBodies(NBody* ptrSun, NBody* ptrEnd)
         {
-            double e = 0.0;
-            for (NBody* bi = ptrSun; bi <= ptrEnd; ++bi)
+            const double Pi = 3.141592653589793;
+            const double Solarmass = 4 * Pi * Pi;
+            const double DaysPeryear = 365.24;
+            unchecked
             {
-                double
-                    imass = bi->mass,
-                    ix = bi->x,
-                    iy = bi->y,
-                    iz = bi->z,
-                    ivx = bi->vx,
-                    ivy = bi->vy,
-                    ivz = bi->vz;
-                e += 0.5 * imass * (ivx * ivx + ivy * ivy + ivz * ivz);
-                for (NBody* bj = bi + 1; bj <= ptrEnd; ++bj)
+                ptrSun[1] = new NBody
+                { //jupiter
+                    mass = 9.54791938424326609e-04 * Solarmass,
+                    x = 4.84143144246472090e+00,
+                    y = -1.16032004402742839e+00,
+                    z = -1.03622044471123109e-01,
+                    vx = 1.66007664274403694e-03 * DaysPeryear,
+                    vy = 7.69901118419740425e-03 * DaysPeryear,
+                    vz = -6.90460016972063023e-05 * DaysPeryear
+                };
+                ptrSun[2] = new NBody
+                { //saturn
+                    mass = 2.85885980666130812e-04 * Solarmass,
+                    x = 8.34336671824457987e+00,
+                    y = 4.12479856412430479e+00,
+                    z = -4.03523417114321381e-01,
+                    vx = -2.76742510726862411e-03 * DaysPeryear,
+                    vy = 4.99852801234917238e-03 * DaysPeryear,
+                    vz = 2.30417297573763929e-05 * DaysPeryear
+                };
+                ptrSun[3] = new NBody
+                { //uranus
+                    mass = 4.36624404335156298e-05 * Solarmass,
+                    x = 1.28943695621391310e+01,
+                    y = -1.51111514016986312e+01,
+                    z = -2.23307578892655734e-01,
+                    vx = 2.96460137564761618e-03 * DaysPeryear,
+                    vy = 2.37847173959480950e-03 * DaysPeryear,
+                    vz = -2.96589568540237556e-05 * DaysPeryear
+                };
+                ptrSun[4] = new NBody
+                { //neptune
+                    mass = 5.15138902046611451e-05 * Solarmass,
+                    x = 1.53796971148509165e+01,
+                    y = -2.59193146099879641e+01,
+                    z = 1.79258772950371181e-01,
+                    vx = 2.68067772490389322e-03 * DaysPeryear,
+                    vy = 1.62824170038242295e-03 * DaysPeryear,
+                    vz = -9.51592254519715870e-05 * DaysPeryear
+                };
+
+                double vx = 0, vy = 0, vz = 0;
+                for (NBody* planet = ptrSun + 1; planet <= ptrEnd; ++planet)
                 {
-                    double
-                        jmass = bj->mass,
-                        dx = ix - bj->x,
-                        dy = iy - bj->y,
-                        dz = iz - bj->z;
-
-                    var test = Math.Sqrt(dx * dx + dy * dy + dz * dz);
-
-                    e -= imass * jmass / test;
+                    double mass = planet->mass;
+                    vx += planet->vx * mass;
+                    vy += planet->vy * mass;
+                    vz += planet->vz * mass;
                 }
+                ptrSun->mass = Solarmass;
+                ptrSun->vx = vx / -Solarmass;
+                ptrSun->vy = vy / -Solarmass;
+                ptrSun->vz = vz / -Solarmass;
             }
-            return e;
-        }
-    }
-
-    private static void InitBodies(NBody* ptrSun, NBody* ptrEnd)
-    {
-        const double Pi = 3.141592653589793;
-        const double Solarmass = 4 * Pi * Pi;
-        const double DaysPeryear = 365.24;
-        unchecked
-        {
-            ptrSun[1] = new NBody
-            { //jupiter
-                mass = 9.54791938424326609e-04 * Solarmass,
-                x = 4.84143144246472090e+00,
-                y = -1.16032004402742839e+00,
-                z = -1.03622044471123109e-01,
-                vx = 1.66007664274403694e-03 * DaysPeryear,
-                vy = 7.69901118419740425e-03 * DaysPeryear,
-                vz = -6.90460016972063023e-05 * DaysPeryear
-            };
-            ptrSun[2] = new NBody
-            { //saturn
-                mass = 2.85885980666130812e-04 * Solarmass,
-                x = 8.34336671824457987e+00,
-                y = 4.12479856412430479e+00,
-                z = -4.03523417114321381e-01,
-                vx = -2.76742510726862411e-03 * DaysPeryear,
-                vy = 4.99852801234917238e-03 * DaysPeryear,
-                vz = 2.30417297573763929e-05 * DaysPeryear
-            };
-            ptrSun[3] = new NBody
-            { //uranus
-                mass = 4.36624404335156298e-05 * Solarmass,
-                x = 1.28943695621391310e+01,
-                y = -1.51111514016986312e+01,
-                z = -2.23307578892655734e-01,
-                vx = 2.96460137564761618e-03 * DaysPeryear,
-                vy = 2.37847173959480950e-03 * DaysPeryear,
-                vz = -2.96589568540237556e-05 * DaysPeryear
-            };
-            ptrSun[4] = new NBody
-            { //neptune
-                mass = 5.15138902046611451e-05 * Solarmass,
-                x = 1.53796971148509165e+01,
-                y = -2.59193146099879641e+01,
-                z = 1.79258772950371181e-01,
-                vx = 2.68067772490389322e-03 * DaysPeryear,
-                vy = 1.62824170038242295e-03 * DaysPeryear,
-                vz = -9.51592254519715870e-05 * DaysPeryear
-            };
-
-            double vx = 0, vy = 0, vz = 0;
-            for (NBody* planet = ptrSun + 1; planet <= ptrEnd; ++planet)
-            {
-                double mass = planet->mass;
-                vx += planet->vx * mass;
-                vy += planet->vy * mass;
-                vz += planet->vz * mass;
-            }
-            ptrSun->mass = Solarmass;
-            ptrSun->vx = vx / -Solarmass;
-            ptrSun->vy = vy / -Solarmass;
-            ptrSun->vz = vz / -Solarmass;
         }
     }
 }

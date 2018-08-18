@@ -1,8 +1,11 @@
 ﻿using System;
+using System.Diagnostics;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.X86;
+using System.Threading.Tasks;
 
 namespace NBodyHWIntrinsics
 {
@@ -25,9 +28,13 @@ namespace NBodyHWIntrinsics
         private const int VzPtrOffset = VyPtrOffset + sizeof(double);
         private const int MPtrOffset  = VzPtrOffset + sizeof(double);
 
+        public const int NBodySize = MPtrOffset + 8;
+
         private const double Pi = 3.141592653589793;
         private const double Solarmass = 4 * Pi * Pi;
         private const double DaysPerYear = 365.24;
+
+        private static readonly string format = "0,0";
 
         [FieldOffset(XOffset)]
         public fixed double x[Length];
@@ -73,68 +80,113 @@ namespace NBodyHWIntrinsics
 
         public static void Main(string[] args)
         {
-            NBody nBody = new NBody();
-            NBody* nBodyPtr = (NBody*)nBody.x;
-            nBody.Initialize(nBodyPtr);
+            var stopWatch = Stopwatch.StartNew();
+#if FEATURE_TIMING
+            Console.WriteLine($"Running on .NETCoreApp: {GetNetCoreVersion()}");
+            long ticks = Stopwatch.GetTimestamp();
+#endif
+            NBody* nBodyPtr = stackalloc NBody[1];
+#if FEATURE_TIMING
 
-            Console.Out.WriteLineAsync(nBody.Energy().ToString("F9"));
+            var stopWatch = Stopwatch.StartNew();
+
+            stopWatch.Restart();
+#endif
+
+            nBodyPtr->Initialize(nBodyPtr);
+
+#if FEATURE_TIMING
+            stopWatch.Stop();
+            Console.WriteLine($"Elapsed Initialize: {stopWatch.ElapsedTicks.ToString(format)}");
+
+            stopWatch.Restart();
+#endif
+
+            Console.Out.WriteLineAsync(nBodyPtr->Energy().ToString("F9"));
+
+#if FEATURE_TIMING
+            stopWatch.Stop();
+            Console.WriteLine($"Elapsed Enenrgy origin: {stopWatch.ElapsedTicks.ToString(format)}");
+#endif
 
             int iterations = args.Length > 0 ? Int32.Parse(args[0]) : 50000000;
 
-            while(iterations-- > 0)
+#if FEATURE_TIMING
+            stopWatch.Restart();
+#endif
+            while (iterations-- > 0)
             {
-                nBody.Advance();
+                nBodyPtr->Advance();
             }
 
-            Console.Out.WriteLineAsync(nBody.Energy().ToString("F9"));
+#if FEATURE_TIMING
+
+            stopWatch.Stop();
+            Console.WriteLine($"Elapsed Advance: {stopWatch.ElapsedTicks.ToString(format)}");
+
+            stopWatch.Restart();
+#endif
+
+            Console.Out.WriteLine(nBodyPtr->Energy().ToString("F9"));
+
+#if FEATURE_TIMING
+            stopWatch.Stop();
+            Console.WriteLine($"Elapsed Enenrgy target: {stopWatch.ElapsedTicks.ToString(format)}");
+
+
+            long endTicks = Stopwatch.GetTimestamp();
+            Console.WriteLine($"Elapsed total time: {(endTicks - ticks).ToString(format)}");
+#endif
+            stopWatch.Stop();
+            Console.WriteLine($"NBodyHWIntrinsics C# Elapsed Time: {stopWatch.Elapsed}");
         }
 
-        private void Initialize(NBody* nbodyPtr)
+        public void Initialize(NBody* ptr)
         {
             // Align fixed Array to 16 bytes
-            ulong alignOffset = (ulong)nbodyPtr % 16;
-            ulong dataAddr = alignOffset == 0 ? (ulong)nbodyPtr : (ulong)nbodyPtr + (16 - alignOffset);
+            ulong alignOffset = (ulong)ptr % 16;
+            ulong dataAddr = alignOffset == 0 ? (ulong)ptr : (ulong)ptr + (16 - alignOffset);
             double* dataPtr = (double*)(dataAddr);
 
-            XPtr  = dataPtr;
-            YPtr  = (double*)(dataAddr + YOffset);
-            ZPtr  = (double*)(dataAddr + ZOffset);
+            XPtr = dataPtr;
+            YPtr = (double*)(dataAddr + YOffset);
+            ZPtr = (double*)(dataAddr + ZOffset);
             VxPtr = (double*)(dataAddr + VXOffset);
             VyPtr = (double*)(dataAddr + VYOffset);
             VzPtr = (double*)(dataAddr + VZOffset);
-            MPtr  = (double*)(dataAddr + MOffset);
+            MPtr = (double*)(dataAddr + MOffset);
 
-            XPtr[0] = 4.84143144246472090e+00;
-            XPtr[1] = 8.34336671824457987e+00;
-            XPtr[2] = 1.28943695621391310e+01;
-            XPtr[3] = 1.53796971148509165e+01;
+            XPtr[2] = 4.84143144246472090e+00;
+            XPtr[3] = 8.34336671824457987e+00;
+            XPtr[4] = 1.28943695621391310e+01;
+            XPtr[5] = 1.53796971148509165e+01;
 
-            YPtr[0] = -1.16032004402742839e+00;
-            YPtr[1] =  4.12479856412430479e+00;
-            YPtr[2] = -1.51111514016986312e+01;
-            YPtr[3] = -2.59193146099879641e+01;
+            YPtr[2] = -1.16032004402742839e+00;
+            YPtr[3] = 4.12479856412430479e+00;
+            YPtr[4] = -1.51111514016986312e+01;
+            YPtr[5] = -2.59193146099879641e+01;
 
-            ZPtr[0] = -1.03622044471123109e-01;
-            ZPtr[1] = -4.03523417114321381e-01;
-            ZPtr[2] = -2.23307578892655734e-01;
-            ZPtr[3] =  1.79258772950371181e-01;
+            ZPtr[2] = -1.03622044471123109e-01;
+            ZPtr[3] = -4.03523417114321381e-01;
+            ZPtr[4] = -2.23307578892655734e-01;
+            ZPtr[5] = 1.79258772950371181e-01;
 
-            VxPtr[0] = 1.66007664274403694e-03;
-            VxPtr[1] = -2.76742510726862411e-03;
-            VxPtr[2] = 2.96460137564761618e-03;
-            VxPtr[3] = 2.68067772490389322e-03;
+            VxPtr[2] = 1.66007664274403694e-03;
+            VxPtr[3] = -2.76742510726862411e-03;
+            VxPtr[4] = 2.96460137564761618e-03;
+            VxPtr[5] = 2.68067772490389322e-03;
 
-            VyPtr[0] = 7.69901118419740425e-03;
-            VyPtr[1] = 4.99852801234917238e-03;
-            VyPtr[2] = 2.37847173959480950e-03;
-            VyPtr[3] = 1.62824170038242295e-03;
+            VyPtr[2] = 7.69901118419740425e-03;
+            VyPtr[3] = 4.99852801234917238e-03;
+            VyPtr[4] = 2.37847173959480950e-03;
+            VyPtr[5] = 1.62824170038242295e-03;
 
-            VzPtr[0] = -6.90460016972063023e-05;
-            VzPtr[1] = 2.30417297573763929e-05;
-            VzPtr[2] = -2.96589568540237556e-05;
-            VzPtr[3] = -9.51592254519715870e-05;
+            VzPtr[2] = -6.90460016972063023e-05;
+            VzPtr[3] = 2.30417297573763929e-05;
+            VzPtr[4] = -2.96589568540237556e-05;
+            VzPtr[5] = -9.51592254519715870e-05;
 
-            MPtr[4] = Solarmass;
+            MPtr[0] = Solarmass;
 
             if (Sse3.IsSupported)
             {
@@ -147,35 +199,34 @@ namespace NBodyHWIntrinsics
 
                 double* mInitData = stackalloc double[] { 9.54791938424326609e-04, 2.85885980666130812e-04, 4.36624404335156298e-05, 5.15138902046611451e-05 };
 
-                for (int i = 0; i < 4; i += 2)
+                for (int i = 2; i < 6; i += 2)
                 {
-                    Vector128<double> vxV = Unsafe.Read<Vector128<double>>(VxPtr + i);
-                    Vector128<double> vyV = Unsafe.Read<Vector128<double>>(VyPtr + i);
-                    Vector128<double> vzV = Unsafe.Read<Vector128<double>>(VzPtr + i);
+                    Vector128<double> vxV = Sse2.LoadAlignedVector128(VxPtr + i);
+                    Vector128<double> vyV = Sse2.LoadAlignedVector128(VyPtr + i);
+                    Vector128<double> vzV = Sse2.LoadAlignedVector128(VzPtr + i);
 
                     // Initialize v(xyz) vectors
                     vxV = Sse2.Multiply(vxV, yearInDays);
                     vyV = Sse2.Multiply(vyV, yearInDays);
                     vzV = Sse2.Multiply(vzV, yearInDays);
 
-                    // Save initialized v(xyz) vectors
-                    Unsafe.Write(VxPtr + i, vxV);
-                    Unsafe.Write(VyPtr + i, vyV);
-                    Unsafe.Write(VzPtr + i, vzV);
-
-                    // Initialize and save m vector
-                    Vector128<double> mV = Unsafe.Read<Vector128<double>>(mInitData + i);
+                    // Initialize mV vector
+                    Vector128<double> mV = Unsafe.Read<Vector128<double>>(mInitData + i - 2);
                     mV = Sse2.Multiply(mV, mSol);
-                    Unsafe.Write(MPtr + i, mV);
 
                     // Try to use RM second op overload
-                    var vxmV = Sse2.Multiply(mV, vxV);
-                    var vymV = Sse2.Multiply(mV, vyV);
-                    var vzmV = Sse2.Multiply(mV, vzV);
+                    vx = Sse2.Add(vx, Sse2.Multiply(mV, vxV));
+                    vy = Sse2.Add(vy, Sse2.Multiply(mV, vyV));
+                    vz = Sse2.Add(vz, Sse2.Multiply(mV, vzV));
 
-                    vx = Sse2.Add(vx, vxmV);
-                    vy = Sse2.Add(vy, vymV);
-                    vz = Sse2.Add(vz, vzmV);
+                    // Save mV vector
+                    Unsafe.Write(MPtr + i, mV);
+
+                    // Save initialized v(xyz) vectors
+                    Sse2.StoreAligned(VxPtr + i, vxV);
+                    Sse2.StoreAligned(VyPtr + i, vyV);
+                    Sse2.StoreAligned(VzPtr + i, vzV);
+
                 }
 
                 vx = Sse3.HorizontalAdd(vx, vy);
@@ -183,29 +234,40 @@ namespace NBodyHWIntrinsics
                 vz = Sse3.HorizontalAdd(vz, vz);
                 vz = Sse2.Divide(vz, mSol);
 
-                VxPtr[4] = Sse2.ConvertToDouble(vx);
+                VxPtr[0] = Sse2.ConvertToDouble(vx);
                 vx = Sse.StaticCast<byte, double>(Sse2.ShiftRightLogical128BitLane(Sse.StaticCast<double, byte>(vx), 8));
-                VyPtr[4] = Sse2.ConvertToDouble(vx);
-                VzPtr[4] = Sse2.ConvertToDouble(vz);
+                VyPtr[0] = Sse2.ConvertToDouble(vx);
+                VzPtr[0] = Sse2.ConvertToDouble(vz);
             }
         }
 
-        private double Energy()
+        public static string GetNetCoreVersion()
+        {
+            var assembly = typeof(System.Runtime.GCSettings).GetTypeInfo().Assembly;
+            var assemblyPath = assembly.CodeBase.Split(new[] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries);
+            int netCoreAppIndex = Array.IndexOf(assemblyPath, "Microsoft.NETCore.App");
+            if (netCoreAppIndex > 0 && netCoreAppIndex < assemblyPath.Length - 2)
+                return assemblyPath[netCoreAppIndex + 1];
+            return null;
+        }
+
+        public double Energy()
         {
             double result = 0.0;
             double*
-                xPtr  = XPtr + 4,
-                yPtr  = YPtr + 4,
-                zPtr  = ZPtr + 4,
-                vxPtr = VxPtr + 4,
-                vyPtr = VyPtr + 4,
-                vzPtr = VzPtr + 4,
-                mPtr  = MPtr + 4;
+                xPtr  = XPtr,
+                yPtr  = YPtr,
+                zPtr  = ZPtr,
+                vxPtr = VxPtr,
+                vyPtr = VyPtr,
+                vzPtr = VzPtr,
+                mPtr  = MPtr;
 
             var resultV = Sse2.SetZeroVector128<double>();
             var div2V = Sse2.SetAllVector128(0.5);
 
-            for (int i = 5, k = 0; i == 5 || i < 4; i += 2, mPtr += 2, vxPtr += 2, vyPtr+= 2, vzPtr+= 2, xPtr+= 2, yPtr+= 2, zPtr+= 2)
+            // Calls for optimization - use intstruction level parallelizm
+            for (int i = 0, k = 2; i < 6; i += 2, mPtr += 2, vxPtr += 2, vyPtr+= 2, vzPtr+= 2, xPtr+= 2, yPtr+= 2, zPtr+= 2)
             {
                 var mV = Sse2.LoadAlignedVector128(mPtr);
                 var vxV = Sse2.LoadAlignedVector128(vxPtr);
@@ -229,6 +291,11 @@ namespace NBodyHWIntrinsics
 
                 for (int z = 0; z < 2; z++, k++)
                 {
+                    if (z == 1 && k == 3)
+                    {
+                        break;
+                    }
+
                     if (z == 0)
                     {
                         vxV = Sse2.UnpackLow(mV, mV);
@@ -239,21 +306,6 @@ namespace NBodyHWIntrinsics
                     }
 
                     resultV = EnergyInner(resultV, k, vxV, xV, yV, zV);
-                    if (i == 5) break;
-                }
-
-
-                if (i == 5)
-                {
-                    xPtr = XPtr - 2;
-                    yPtr = YPtr - 2;
-                    zPtr = ZPtr - 2;
-                    vxPtr = VxPtr - 2;
-                    vyPtr = VyPtr - 2;
-                    vzPtr = VzPtr - 2;
-                    mPtr = MPtr - 2;
-                    i = -2;
-                    k++;
                 }
             }
 
@@ -264,9 +316,10 @@ namespace NBodyHWIntrinsics
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private Vector128<double> EnergyInner(Vector128<double> resultV, int k, Vector128<double> mV, Vector128<double> xV, Vector128<double> yV, Vector128<double> zV)
+        public Vector128<double> EnergyInner(Vector128<double> resultV, int k, Vector128<double> mV, Vector128<double> xV, Vector128<double> yV, Vector128<double> zV)
         {
-            for (int j = k; j < 4; j += 2)
+            // Calls for optimization - use intstruction level parallelizm
+            for (int j = k; j < 6; j += 2)
             {
                 var mLow = Sse2.LoadVector128(MPtr + j);
                 var xLow = Sse2.LoadVector128(XPtr + j);
@@ -294,9 +347,9 @@ namespace NBodyHWIntrinsics
                 yLow = ReciprocalSqrt(xLow);
                 mLow = Sse2.Multiply(mLow, yLow);
 
-                // Eliminate end of loop last column for j == 3
+                // Eliminate end of loop last column for j == 5
                 // otherwise Solar data are computed multiple times
-                if (j != 3)
+                if (j != 5)
                 {
                     resultV = Sse2.Subtract(resultV, mLow);
                 }
@@ -311,84 +364,175 @@ namespace NBodyHWIntrinsics
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void Advance(double distance = 0.01d)
+        public void Advance(double distance = 0.01d)
         {
-            //unchecked
-            //{
-            //    for (NBody* bi = ptrSun; bi < ptrEnd; ++bi)
-            //    {
-
-            //        // Dereference common variables now so they're likely to
-            //        // get stored in registers. The performance advantage is
-            //        // lost if pointers are dereferenced every time. Accounts for ~7%.
-
-            //        double
-            //            ix = bi->x,
-            //            iy = bi->y,
-            //            iz = bi->z,
-            //            ivx = bi->vx,
-            //            ivy = bi->vy,
-            //            ivz = bi->vz,
-            //            imass = bi->mass;
-            //        for (NBody* bj = bi + 1; bj <= ptrEnd; ++bj)
-            //        {
-            //            double
-            //                dx = bj->x - ix,
-            //                dy = bj->y - iy,
-            //                dz = bj->z - iz,
-            //                jmass = bj->mass,
-            //                var dd = GetD2(dx, dy, dz);
-            //                var drs = ReciprocalSqrt(dd);
-            //                mag = distance * drs / dd ; // check how expensive is recirpocal dd
-
-            //            bj->vx = bj->vx - dx * imass * mag;
-            //            bj->vy = bj->vy - dy * imass * mag;
-            //            bj->vz = bj->vz - dz * imass * mag;
-            //            ivx = ivx + dx * jmass * mag;
-            //            ivy = ivy + dy * jmass * mag;
-            //            ivz = ivz + dz * jmass * mag;
-            //        }
-            //        bi->vx = ivx;
-            //        bi->vy = ivy;
-            //        bi->vz = ivz;
-            //        bi->x = ix + ivx * distance;
-            //        bi->y = iy + ivy * distance;
-            //        bi->z = iz + ivz * distance;
-            //    }
-            //    ptrEnd->x = ptrEnd->x + ptrEnd->vx * distance;
-            //    ptrEnd->y = ptrEnd->y + ptrEnd->vy * distance;
-            //    ptrEnd->z = ptrEnd->z + ptrEnd->vz * distance;
-            //}
+            Vector128<double> disV = Sse2.SetAllVector128(distance);
 
             double*
-                xPtr = XPtr + 4,
-                yPtr = YPtr + 4,
-                zPtr = ZPtr + 4,
-                vxPtr = VxPtr + 4,
-                vyPtr = VyPtr + 4,
-                vzPtr = VzPtr + 4,
-                mPtr = MPtr + 4;
+                    xPtr = XPtr,
+                    yPtr = YPtr,
+                    zPtr = ZPtr,
+                    vxPtr = VxPtr,
+                    vyPtr = VyPtr,
+                    vzPtr = VzPtr,
+                    mPtr = MPtr;
 
-            for (int i = 5, k = 0; i == 5 || i < 4; i += 2, mPtr += 2, vxPtr += 2, vyPtr += 2, vzPtr += 2, xPtr += 2, yPtr += 2, zPtr += 2)
+            for (int i = 0, k = 2; i < 6; i++, k++, mPtr++, vxPtr++, vyPtr++, vzPtr++, xPtr++, yPtr++, zPtr++)
             {
+                var mV = Sse3.LoadAndDuplicateToVector128(mPtr);
+                var xV = Sse3.LoadAndDuplicateToVector128(xPtr);
+                var yV = Sse3.LoadAndDuplicateToVector128(yPtr);
+                var zV = Sse3.LoadAndDuplicateToVector128(zPtr);
+                var vxV = Sse3.LoadAndDuplicateToVector128(vxPtr);
+                var vyV = Sse3.LoadAndDuplicateToVector128(vyPtr);
+                var vzV = Sse3.LoadAndDuplicateToVector128(vzPtr);
 
+                for (int j = (k - k % 2); j < 6; j += 2)
+                {
+                    var xxV = Sse2.LoadAlignedVector128(XPtr + j);
+                    var yyV = Sse2.LoadAlignedVector128(YPtr + j);
+                    var zzV = Sse2.LoadAlignedVector128(ZPtr + j);
 
-            }
+                    xxV = Sse2.Multiply(xxV, xV);
+                    yyV = Sse2.Multiply(yyV, yV);
+                    zzV = Sse2.Multiply(zzV, zV);
+
+                    var mag = Get2D(xxV, yyV, zzV);
+                    mag = Sse2.Multiply(Reciprocal(mag), ReciprocalSqrt(mag));
+                    mag = Sse2.Multiply(mag, disV);
+
+                    var imag = Sse2.Multiply(mV, mag);
+                    Sse2.StoreAligned(VxPtr + j, Sse2.Subtract(Sse2.LoadAlignedVector128(VxPtr + j), Sse2.Multiply(imag, xxV)));
+                    Sse2.StoreAligned(VyPtr + j, Sse2.Subtract(Sse2.LoadAlignedVector128(VyPtr + j), Sse2.Multiply(imag, yyV)));
+                    Sse2.StoreAligned(VzPtr + j, Sse2.Subtract(Sse2.LoadAlignedVector128(VzPtr + j), Sse2.Multiply(imag, zzV)));
+
+                    var jmag = Sse2.Multiply(Sse2.LoadAlignedVector128(MPtr + j), mag);
+                    vxV = Sse2.Add(vxV, Sse2.Multiply(jmag, xxV));
+                    vyV = Sse2.Add(vyV, Sse2.Multiply(jmag, yyV));
+                    vzV = Sse2.Add(vzV, Sse2.Multiply(jmag, zzV));
+                } // inner loop
+
+                Sse2.StoreScalar(vxPtr, Sse3.HorizontalAdd(vxV, vxV));
+                Sse2.StoreScalar(vxPtr, Sse3.HorizontalAdd(vxV, vxV));
+                Sse2.StoreScalar(vxPtr, Sse3.HorizontalAdd(vxV, vxV));
+
+                xV = Sse2.Add(xV, Sse2.Multiply(vxV, disV));
+                yV = Sse2.Add(yV, Sse2.Multiply(vyV, disV));
+                zV = Sse2.Add(zV, Sse2.Multiply(vzV, disV));
+
+                Sse2.StoreScalar(xPtr, Sse3.HorizontalAdd(xV, xV));
+                Sse2.StoreScalar(yPtr, Sse3.HorizontalAdd(yV, yV));
+                Sse2.StoreScalar(zPtr, Sse3.HorizontalAdd(zV, zV));
+
+                if (i == 0)
+                {
+                    i++;
+                }
+
+            } // outer loop
+
+            //*(xPtr - 1) += (*(vxPtr - 1) * distance);
+            //*(yPtr - 1) += (*(vyPtr - 1) * distance);
+            //*(zPtr - 1) += (*(vzPtr - 1) * distance);
+
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private Vector128<double> Get2D(Vector128<double> dx, Vector128<double> dy, Vector128<double> dz)
+        public static void AdvanceStatic(NBody* nBodyPtr, double distance = 0.01d)
+        {
+            Vector128<double> disV = Sse2.SetAllVector128(distance);
+
+            double*
+                    xPtr = nBodyPtr->XPtr,
+                    yPtr = nBodyPtr->YPtr,
+                    zPtr = nBodyPtr->ZPtr,
+                    vxPtr = nBodyPtr->VxPtr,
+                    vyPtr = nBodyPtr->VyPtr,
+                    vzPtr = nBodyPtr->VzPtr,
+                    mPtr = nBodyPtr->MPtr;
+
+            double*
+                    gxPtr = nBodyPtr->XPtr,
+                    gyPtr = nBodyPtr->YPtr,
+                    gzPtr = nBodyPtr->ZPtr,
+                    gvxPtr = nBodyPtr->VxPtr,
+                    gvyPtr = nBodyPtr->VyPtr,
+                    gvzPtr = nBodyPtr->VzPtr,
+                    gmPtr = nBodyPtr->MPtr;
+
+            for (int i = 0, k = 2; i < 6; i++, k++, mPtr++, vxPtr++, vyPtr++, vzPtr++, xPtr++, yPtr++, zPtr++)
+            {
+                var mV = Sse3.LoadAndDuplicateToVector128(mPtr);
+                var xV = Sse3.LoadAndDuplicateToVector128(xPtr);
+                var yV = Sse3.LoadAndDuplicateToVector128(yPtr);
+                var zV = Sse3.LoadAndDuplicateToVector128(zPtr);
+                var vxV = Sse3.LoadAndDuplicateToVector128(vxPtr);
+                var vyV = Sse3.LoadAndDuplicateToVector128(vyPtr);
+                var vzV = Sse3.LoadAndDuplicateToVector128(vzPtr);
+
+                for (int j = (k - k % 2); j < 6; j += 2)
+                {
+                    var xxV = Sse2.LoadAlignedVector128(gxPtr + j);
+                    var yyV = Sse2.LoadAlignedVector128(gyPtr + j);
+                    var zzV = Sse2.LoadAlignedVector128(gzPtr + j);
+
+                    xxV = Sse2.Multiply(xxV, xV);
+                    yyV = Sse2.Multiply(yyV, yV);
+                    zzV = Sse2.Multiply(zzV, zV);
+
+                    var mag = Get2D(xxV, yyV, zzV);
+                    mag = Sse2.Multiply(Reciprocal(mag), ReciprocalSqrt(mag));
+                    mag = Sse2.Multiply(mag, disV);
+
+                    var imag = Sse2.Multiply(mV, mag);
+                    Sse2.StoreAligned(gvxPtr + j, Sse2.Subtract(Sse2.LoadAlignedVector128(gvxPtr + j), Sse2.Multiply(imag, xxV)));
+                    Sse2.StoreAligned(gvyPtr + j, Sse2.Subtract(Sse2.LoadAlignedVector128(gvyPtr + j), Sse2.Multiply(imag, yyV)));
+                    Sse2.StoreAligned(gvzPtr + j, Sse2.Subtract(Sse2.LoadAlignedVector128(gvzPtr + j), Sse2.Multiply(imag, zzV)));
+
+                    var jmag = Sse2.Multiply(Sse2.LoadAlignedVector128(gmPtr + j), mag);
+                    vxV = Sse2.Add(vxV, Sse2.Multiply(jmag, xxV));
+                    vyV = Sse2.Add(vyV, Sse2.Multiply(jmag, yyV));
+                    vzV = Sse2.Add(vzV, Sse2.Multiply(jmag, zzV));
+                } // inner loop
+
+                Sse2.StoreScalar(vxPtr, Sse3.HorizontalAdd(vxV, vxV));
+                Sse2.StoreScalar(vxPtr, Sse3.HorizontalAdd(vxV, vxV));
+                Sse2.StoreScalar(vxPtr, Sse3.HorizontalAdd(vxV, vxV));
+
+                xV = Sse2.Add(xV, Sse2.Multiply(vxV, disV));
+                yV = Sse2.Add(yV, Sse2.Multiply(vyV, disV));
+                zV = Sse2.Add(zV, Sse2.Multiply(vzV, disV));
+
+                Sse2.StoreScalar(xPtr, Sse3.HorizontalAdd(xV, xV));
+                Sse2.StoreScalar(yPtr, Sse3.HorizontalAdd(yV, yV));
+                Sse2.StoreScalar(zPtr, Sse3.HorizontalAdd(zV, zV));
+
+                if (i == 0)
+                {
+                    i++;
+                }
+
+            } // outer loop
+
+            //*(xPtr - 1) += (*(vxPtr - 1) * distance);
+            //*(yPtr - 1) += (*(vyPtr - 1) * distance);
+            //*(zPtr - 1) += (*(vzPtr - 1) * distance);
+
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Vector128<double> Get2D(Vector128<double> dx, Vector128<double> dy, Vector128<double> dz)
         {
             dx = Sse2.Multiply(dx, dx);
             dy = Sse2.Multiply(dy, dy);
             dz = Sse2.Multiply(dz, dz);
-            dx = Sse2.Add(dx, dz);
-            dy = Sse2.Add(dx, dy);
-            return dy;
+            dx = Sse2.Add(dx, dy);
+            dz = Sse2.Add(dx, dz);
+            return dz;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private Vector128<double> Reciprocal(Vector128<double> value)
+        public static Vector128<double> Reciprocal(Vector128<double> value)
         {
             // Implementation of Reciprocal double based on
             // https://github.com/stgatilov/recip_rsqrt_benchmark/blob/4db33061300455585b092eacf0c824ddaaee0da9/routines_sse.h#L121
@@ -406,7 +550,7 @@ namespace NBodyHWIntrinsics
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private Vector128<double> ReciprocalSqrt(Vector128<double> value)
+        public static Vector128<double> ReciprocalSqrt(Vector128<double> value)
         {
             // Implementation of ReciprocalSqrt double based on
             // https://github.com/stgatilov/recip_rsqrt_benchmark/blob/4db33061300455585b092eacf0c824ddaaee0da9/routines_sse.h#L159
